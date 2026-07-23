@@ -70,6 +70,17 @@ before a PR is considered done.
   the provider to that account instead of creating a duplicate — so email/password
   and Apple sign-in (next) resolve to one user.
 
+## Rate limiting
+
+Abuse prevention lives in `src/middleware/rateLimit.js`:
+
+- **Global** — 300 requests / 15 min / IP on everything under `/api`.
+- **Auth** — 10 attempts / 15 min / IP on `POST /api/auth/google` (sign-in is
+  the prime abuse target).
+
+Limits are per client IP; `trust proxy` is set to `1` so the real IP is read
+from Azure's proxy. Both limiters are skipped under `NODE_ENV=test`.
+
 ## Not yet implemented
 
 - **Email/password sign-up** (`bcrypt` is installed and the `passwordHash`
