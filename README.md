@@ -42,21 +42,39 @@ before a PR is considered done.
 
 ## Endpoints
 
-| Method | Path             | Notes                        |
-| ------ | ---------------- | ---------------------------- |
-| GET    | `/health`        | health probe                 |
-| GET    | `/api/posts`     | list posts (`?limit&before`) |
-| POST   | `/api/posts`     | create post                  |
-| GET    | `/api/posts/:id` | get one                      |
-| PATCH  | `/api/posts/:id` | update                       |
-| DELETE | `/api/posts/:id` | delete                       |
-| GET    | `/api/users`     | list users                   |
-| POST   | `/api/users`     | create profile               |
-| GET    | `/api/users/:id` | get one                      |
+| Method | Path                | Notes                                   |
+| ------ | ------------------- | --------------------------------------- |
+| GET    | `/health`           | health probe                            |
+| POST   | `/api/auth/google`  | sign in with a Google ID token          |
+| GET    | `/api/auth/me`      | current user (requires session)         |
+| POST   | `/api/auth/logout`  | clear the session cookie                |
+| GET    | `/api/posts`        | list posts (`?limit&before`) — public   |
+| POST   | `/api/posts`        | create post — **auth**; author = session |
+| GET    | `/api/posts/:id`    | get one — public                        |
+| PATCH  | `/api/posts/:id`    | update — **auth + owner**               |
+| DELETE | `/api/posts/:id`    | delete — **auth + owner**               |
+| GET    | `/api/users`        | list users                              |
+| POST   | `/api/users`        | create profile                          |
+| GET    | `/api/users/:id`    | get one                                 |
+
+## Authentication
+
+- **Google sign-in** (`POST /api/auth/google`): the client obtains a Google ID
+  token via Google Identity Services and posts `{ idToken }`. The backend
+  verifies it (`google-auth-library`), finds-or-creates the user, and sets a
+  **JWT in an httpOnly cookie**. Protect any route with the `requireAuth`
+  middleware (`src/middleware/auth.js`); it also accepts a
+  `Authorization: Bearer <jwt>` header for native clients.
+- Requires `JWT_SECRET` and `GOOGLE_CLIENT_ID` in `.env`.
+- Account linking: signing in with Google on an email that already exists links
+  the provider to that account instead of creating a duplicate — so email/password
+  and Apple sign-in (next) resolve to one user.
 
 ## Not yet implemented
 
-- **Authentication / authorization.** The strategy is undecided and is a
-  restricted area (see CLAUDE.md). `src/middleware/auth.js` defines the shape
-  (`requireAuth`) but returns `501` until implemented. Post/User creation
-  currently takes `author` from the body as a placeholder.
+- **Email/password sign-up** (`bcrypt` is installed and the `passwordHash`
+  field exists; routes are next).
+- **Apple sign-in** — same verify-a-token pattern as Google; the
+  `authProviders` model and `findOrCreateFromProvider` service already support
+  it.
+- Web frontend origin isn't set on the Google client yet (mobile-first launch).

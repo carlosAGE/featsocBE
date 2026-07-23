@@ -1,9 +1,24 @@
 const mongoose = require('mongoose');
 
-// Core user profile. Auth-related fields (passwordHash, provider ids, etc.)
-// are intentionally NOT defined here yet — auth is a restricted area and its
-// strategy is undecided (see CLAUDE.md). Add them alongside the auth
-// implementation so credential handling stays in one reviewed place.
+// A linked external identity (Google now; Apple/others later). A user can
+// have several, so signing in with Google and later with Apple on the same
+// email resolves to one account.
+const authProviderSchema = new mongoose.Schema(
+  {
+    provider: {
+      type: String,
+      enum: ['google', 'apple', 'local'],
+      required: true,
+    },
+    // The provider's stable user id (Google "sub", Apple "sub"). Null for
+    // the local email/password provider.
+    providerId: { type: String, default: null },
+  },
+  { _id: false }
+);
+
+// Core user profile plus auth fields. Credential material lives here but is
+// never serialized to JSON (see toJSON transform + `select: false`).
 const userSchema = new mongoose.Schema(
   {
     username: {
@@ -36,9 +51,29 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+
+    // --- Auth (additive; safe defaults) ---
+    // bcrypt hash for email/password sign-in. Absent for social-only accounts.
+    // `select: false` keeps it out of query results unless explicitly asked.
+    passwordHash: {
+      type: String,
+      select: false,
+      default: undefined,
+    },
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    authProviders: {
+      type: [authProviderSchema],
+      default: [],
+    },
   },
   { timestamps: true }
 );
+
+// Fast lookup when resolving a social login to an account.
+userSchema.index({ 'authProviders.provider': 1, 'authProviders.providerId': 1 });
 
 // Never leak internal fields when serializing to JSON.
 userSchema.set('toJSON', {

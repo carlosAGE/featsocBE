@@ -2,6 +2,7 @@ const express = require('express');
 const { body, param, query } = require('express-validator');
 
 const { validate } = require('../middleware/validate');
+const { requireAuth } = require('../middleware/auth');
 const ctrl = require('../controllers/postController');
 
 const router = express.Router();
@@ -25,16 +26,15 @@ router.get(
 
 router.post(
   '/',
-  [
-    body('content').isString().trim().notEmpty().isLength({ max: 5000 }),
-    body('author').optional().isMongoId(),
-  ],
+  requireAuth,
+  [body('content').isString().trim().notEmpty().isLength({ max: 5000 })],
   validate,
   ctrl.createPost
 );
 
 router.patch(
   '/:id',
+  requireAuth,
   [
     param('id').isMongoId(),
     body('content').optional().isString().trim().notEmpty().isLength({ max: 5000 }),
@@ -45,6 +45,7 @@ router.patch(
 
 router.delete(
   '/:id',
+  requireAuth,
   [param('id').isMongoId()],
   validate,
   ctrl.deletePost

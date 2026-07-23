@@ -32,9 +32,21 @@ const env = {
     .map((o) => o.trim())
     .filter(Boolean),
 
-  // Auth placeholders — see CLAUDE.md. Not wired up yet.
+  // --- Auth ---
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+
+  cookieName: process.env.COOKIE_NAME || 'featsoc_token',
+  cookieSameSite: (process.env.COOKIE_SAMESITE || 'lax').toLowerCase(),
+  cookieDomain: process.env.COOKIE_DOMAIN || undefined,
+
+  // Google OAuth client id(s) accepted when verifying ID tokens. Supports a
+  // comma-separated list so a web client id and native/iOS client id can both
+  // be honored.
+  googleClientIds: (process.env.GOOGLE_CLIENT_ID || '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean),
 };
 
 module.exports = env;
