@@ -34,10 +34,14 @@ describe('POST /api/auth/google', () => {
     // passwordHash must never be serialized
     expect(res.body.data.passwordHash).toBeUndefined();
 
-    // httpOnly session cookie is set
+    // httpOnly session cookie is set (web clients)
     const cookies = res.headers['set-cookie'] || [];
     expect(cookies.join(';')).toMatch(/featsoc_token=/);
     expect(cookies.join(';')).toMatch(/HttpOnly/i);
+
+    // token is also returned in the body (native clients)
+    expect(typeof res.body.token).toBe('string');
+    expect(res.body.token.length).toBeGreaterThan(0);
   });
 
   it('returns the same account (created=false) on second sign-in', async () => {
@@ -102,6 +106,20 @@ describe('GET /api/auth/me', () => {
     const cookie = login.headers['set-cookie'];
 
     const res = await request(app).get('/api/auth/me').set('Cookie', cookie);
+    expect(res.status).toBe(200);
+    expect(res.body.data.email).toBe('newuser@example.com');
+  });
+
+  it('authenticates via the Bearer token from the body (native clients)', async () => {
+    verifyGoogleIdToken.mockResolvedValueOnce(googleProfile);
+    const login = await request(app)
+      .post('/api/auth/google')
+      .send({ idToken: 'valid-token' });
+    const { token } = login.body;
+
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.data.email).toBe('newuser@example.com');
   });

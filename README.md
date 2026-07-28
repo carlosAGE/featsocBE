@@ -61,9 +61,10 @@ before a PR is considered done.
 
 - **Google sign-in** (`POST /api/auth/google`): the client obtains a Google ID
   token via Google Identity Services and posts `{ idToken }`. The backend
-  verifies it (`google-auth-library`), finds-or-creates the user, and sets a
-  **JWT in an httpOnly cookie**. Protect any route with the `requireAuth`
-  middleware (`src/middleware/auth.js`); it also accepts a
+  verifies it (`google-auth-library`), finds-or-creates the user, and issues a
+  JWT **two ways**: as an httpOnly cookie (web) and in the response body as
+  `token` (native/mobile). Protect any route with the `requireAuth`
+  middleware (`src/middleware/auth.js`); it reads the cookie, or a
   `Authorization: Bearer <jwt>` header for native clients.
 - Requires `JWT_SECRET` and `GOOGLE_CLIENT_ID` in `.env`.
 - Account linking: signing in with Google on an email that already exists links

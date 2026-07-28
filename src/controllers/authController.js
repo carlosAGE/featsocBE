@@ -26,7 +26,9 @@ const googleSignIn = asyncHandler(async (req, res) => {
   const token = signAuthToken(user.id);
   setAuthCookie(res, token);
 
-  res.status(created ? 201 : 200).json({ data: user, created });
+  // Web clients use the httpOnly cookie above; native (Android/iOS) clients
+  // store this token and send it as `Authorization: Bearer <token>`.
+  res.status(created ? 201 : 200).json({ data: user, created, token });
 });
 
 // GET /api/auth/me — current authenticated user (requireAuth populates req.user)
