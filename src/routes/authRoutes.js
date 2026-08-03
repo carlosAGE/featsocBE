@@ -26,6 +26,18 @@ router.post(
   ctrl.signup
 );
 
+// Email/password sign in.
+router.post(
+  '/login',
+  authLimiter,
+  [
+    body('email').trim().isEmail().withMessage('A valid email is required'),
+    body('password').isString().notEmpty().withMessage('Password is required'),
+  ],
+  validate,
+  ctrl.login
+);
+
 // Social sign-in (Google).
 router.post(
   '/google',

@@ -76,6 +76,81 @@ describe('POST /api/auth/signup', () => {
   });
 });
 
+describe('POST /api/auth/login', () => {
+  const creds = { email: 'login@example.com', password: 'supersecret' };
+
+  async function signup() {
+    return request(app).post('/api/auth/signup').send(creds);
+  }
+
+  it('logs in with correct credentials and returns { token, user }', async () => {
+    await signup();
+
+    const res = await request(app).post('/api/auth/login').send(creds);
+    expect(res.status).toBe(200);
+    expect(res.body.user.email).toBe('login@example.com');
+    expect(typeof res.body.token).toBe('string');
+    expect(res.body.user.passwordHash).toBeUndefined();
+
+    const cookies = res.headers['set-cookie'] || [];
+    expect(cookies.join(';')).toMatch(/featsoc_token=/);
+  });
+
+  it('is case-insensitive on the email', async () => {
+    await signup();
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'LOGIN@Example.com', password: creds.password });
+    expect(res.status).toBe(200);
+  });
+
+  it('rejects a wrong password with 401', async () => {
+    await signup();
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: creds.email, password: 'wrongpassword' });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects an unknown email with 401', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'nobody@example.com', password: 'supersecret' });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects a social-only account (no password) with 401', async () => {
+    await User.create({
+      username: 'socialonly',
+      email: 'social@example.com',
+      authProviders: [{ provider: 'google', providerId: 'g-1' }],
+    });
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'social@example.com', password: 'anything123' });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects a missing password with 400', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: creds.email });
+    expect(res.status).toBe(400);
+  });
+
+  it('issues a token that authenticates GET /api/auth/me', async () => {
+    await signup();
+    const login = await request(app).post('/api/auth/login').send(creds);
+    const { token } = login.body;
+
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.user.email).toBe('login@example.com');
+  });
+});
+
 describe('POST /api/auth/google', () => {
   it('creates a new account and sets a session cookie on first sign-in', async () => {
     verifyGoogleIdToken.mockResolvedValueOnce(googleProfile);

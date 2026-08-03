@@ -6,7 +6,7 @@ const {
   createLocalUser,
 } = require('../services/authService');
 const { signAuthToken } = require('../lib/jwt');
-const { hashPassword } = require('../lib/password');
+const { hashPassword, verifyPassword } = require('../lib/password');
 const { setAuthCookie, clearAuthCookie } = require('../lib/cookie');
 const User = require('../models/User');
 
@@ -34,6 +34,25 @@ const signup = asyncHandler(async (req, res) => {
   const user = await createLocalUser({ email, passwordHash });
 
   res.status(201).json(issueSession(res, user, { created: true }));
+});
+
+// POST /api/auth/login  — email/password sign in.
+// Body: { email, password }
+const login = asyncHandler(async (req, res) => {
+  const email = String(req.body.email).trim().toLowerCase();
+  const { password } = req.body;
+
+  // passwordHash is select:false, so ask for it explicitly.
+  const user = await User.findOne({ email }).select('+passwordHash');
+
+  // One generic error for "no such user", "social-only account", and "wrong
+  // password" so we don't leak which emails exist.
+  const ok = user && (await verifyPassword(password, user.passwordHash));
+  if (!ok) {
+    throw new ApiError(401, 'Invalid email or password');
+  }
+
+  res.json(issueSession(res, user));
 });
 
 // POST /api/auth/google  — sign in with a Google ID token.
@@ -68,4 +87,4 @@ const logout = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
-module.exports = { signup, googleSignIn, me, logout };
+module.exports = { signup, login, googleSignIn, me, logout };

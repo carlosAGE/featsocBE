@@ -207,3 +207,26 @@ An **append-only** history of decisions, completed work, and open questions.
 - Running on a different port needs no code change: `env.js` reads
   `process.env.PORT` (default 3000). Set `PORT=3002` in `.env`.
 - Refs: src/config/env.js
+
+---
+
+### 2026-08-03 · X-004 · Email/password login implemented
+- Added `POST /api/auth/login` (body `{ email, password }`). Looks up the user
+  with `.select('+passwordHash')`, verifies with bcrypt, returns
+  `{ token, user }` and sets the cookie. Rate-limited via the auth limiter.
+- Why: completes the email/password pair; FE was already wired for it.
+- Refs: src/controllers/authController.js (login), src/routes/authRoutes.js
+- Fulfills: T-004. Resolves the login half of O-001.
+
+### 2026-08-03 · D-011 · Generic 401 on login (no user enumeration)
+- "No such user", "social-only account (no password set)", and "wrong
+  password" all return the same `401 Invalid email or password`.
+- Why: avoids leaking which emails have accounts / which use social login.
+- Refs: src/controllers/authController.js (login)
+
+### 2026-08-03 · NOTE · Dev server moved to nodemon
+- `npm start` (plain node) was serving a stale build (signup 404'd). Restarted
+  under `npm run dev` (nodemon) so file changes auto-reload in dev.
+- Observed: dev DB connected as `test` (not `featsoc`) — MONGODB_URI likely
+  points at the default DB. Not changed (won't touch `.env`); flagged for
+  maintainer.
