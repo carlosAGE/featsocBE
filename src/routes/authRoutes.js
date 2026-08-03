@@ -8,9 +8,25 @@ const ctrl = require('../controllers/authController');
 
 const router = express.Router();
 
-// Social sign-in (Google). Rate-limited harder than the rest of the API,
-// since sign-in is the prime abuse target. Email/password routes will be
-// added alongside this file as the next step.
+// Auth endpoints are rate-limited harder than the rest of the API, since
+// sign-up/sign-in are the prime abuse targets.
+
+// Email/password registration.
+router.post(
+  '/signup',
+  authLimiter,
+  [
+    body('email').trim().isEmail().withMessage('A valid email is required'),
+    body('password')
+      .isString()
+      .isLength({ min: 8 })
+      .withMessage('Password must be at least 8 characters'),
+  ],
+  validate,
+  ctrl.signup
+);
+
+// Social sign-in (Google).
 router.post(
   '/google',
   authLimiter,

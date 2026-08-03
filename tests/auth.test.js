@@ -18,6 +18,64 @@ const googleProfile = {
   picture: 'https://example.com/pic.png',
 };
 
+describe('POST /api/auth/signup', () => {
+  const creds = { email: 'signup@example.com', password: 'supersecret' };
+
+  it('creates an account and returns { token, user } (201)', async () => {
+    const res = await request(app).post('/api/auth/signup').send(creds);
+
+    expect(res.status).toBe(201);
+    expect(res.body.user.id).toBeDefined();
+    expect(res.body.user.email).toBe('signup@example.com');
+    expect(typeof res.body.token).toBe('string');
+    // hash must never be exposed
+    expect(res.body.user.passwordHash).toBeUndefined();
+
+    // web cookie is also set
+    const cookies = res.headers['set-cookie'] || [];
+    expect(cookies.join(';')).toMatch(/featsoc_token=/);
+  });
+
+  it('lowercases and trims the email', async () => {
+    const res = await request(app)
+      .post('/api/auth/signup')
+      .send({ email: '  MixedCase@Example.com  ', password: 'supersecret' });
+    expect(res.status).toBe(201);
+    expect(res.body.user.email).toBe('mixedcase@example.com');
+  });
+
+  it('rejects a duplicate email with 409', async () => {
+    await request(app).post('/api/auth/signup').send(creds);
+    const res = await request(app).post('/api/auth/signup').send(creds);
+    expect(res.status).toBe(409);
+  });
+
+  it('rejects an invalid email with 400', async () => {
+    const res = await request(app)
+      .post('/api/auth/signup')
+      .send({ email: 'not-an-email', password: 'supersecret' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a short password with 400', async () => {
+    const res = await request(app)
+      .post('/api/auth/signup')
+      .send({ email: 'x@example.com', password: 'short' });
+    expect(res.status).toBe(400);
+  });
+
+  it('issues a token that authenticates GET /api/auth/me', async () => {
+    const signup = await request(app).post('/api/auth/signup').send(creds);
+    const { token } = signup.body;
+
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.user.email).toBe('signup@example.com');
+  });
+});
+
 describe('POST /api/auth/google', () => {
   it('creates a new account and sets a session cookie on first sign-in', async () => {
     verifyGoogleIdToken.mockResolvedValueOnce(googleProfile);
@@ -28,11 +86,10 @@ describe('POST /api/auth/google', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.created).toBe(true);
-    expect(res.body.data.email).toBe('newuser@example.com');
-    expect(res.body.data.emailVerified).toBe(true);
-    expect(res.body.data.username).toBeDefined();
-    // passwordHash must never be serialized
-    expect(res.body.data.passwordHash).toBeUndefined();
+    expect(res.body.user.email).toBe('newuser@example.com');
+    expect(res.body.user.emailVerified).toBe(true);
+    expect(res.body.user.username).toBeDefined();
+    expect(res.body.user.passwordHash).toBeUndefined();
 
     // httpOnly session cookie is set (web clients)
     const cookies = res.headers['set-cookie'] || [];
@@ -54,7 +111,7 @@ describe('POST /api/auth/google', () => {
       .post('/api/auth/google')
       .send({ idToken: 'valid-token' });
 
-    expect(first.body.data.id).toBe(second.body.data.id);
+    expect(first.body.user.id).toBe(second.body.user.id);
     expect(second.status).toBe(200);
     expect(second.body.created).toBe(false);
     expect(await User.countDocuments()).toBe(1);
@@ -72,7 +129,7 @@ describe('POST /api/auth/google', () => {
       .send({ idToken: 'valid-token' });
 
     expect(res.status).toBe(200);
-    expect(res.body.data.id).toBe(existing.id);
+    expect(res.body.user.id).toBe(existing.id);
     expect(await User.countDocuments()).toBe(1);
   });
 
@@ -107,7 +164,7 @@ describe('GET /api/auth/me', () => {
 
     const res = await request(app).get('/api/auth/me').set('Cookie', cookie);
     expect(res.status).toBe(200);
-    expect(res.body.data.email).toBe('newuser@example.com');
+    expect(res.body.user.email).toBe('newuser@example.com');
   });
 
   it('authenticates via the Bearer token from the body (native clients)', async () => {
@@ -121,7 +178,7 @@ describe('GET /api/auth/me', () => {
       .get('/api/auth/me')
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
-    expect(res.body.data.email).toBe('newuser@example.com');
+    expect(res.body.user.email).toBe('newuser@example.com');
   });
 });
 
@@ -130,7 +187,6 @@ describe('POST /api/auth/logout', () => {
     const res = await request(app).post('/api/auth/logout');
     expect(res.status).toBe(204);
     const cookies = res.headers['set-cookie'] || [];
-    // clearing sets the cookie with an expired/empty value
     expect(cookies.join(';')).toMatch(/featsoc_token=/);
   });
 });

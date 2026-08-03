@@ -36,6 +36,9 @@ const env = {
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
 
+  // bcrypt cost factor for password hashing.
+  bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || '12', 10),
+
   cookieName: process.env.COOKIE_NAME || 'featsoc_token',
   cookieSameSite: (process.env.COOKIE_SAMESITE || 'lax').toLowerCase(),
   cookieDomain: process.env.COOKIE_DOMAIN || undefined,

@@ -82,6 +82,8 @@ userSchema.set('toJSON', {
   transform: (doc, ret) => {
     ret.id = ret._id;
     delete ret._id;
+    // Belt-and-braces: never expose the hash even if a query selected it.
+    delete ret.passwordHash;
     return ret;
   },
 });

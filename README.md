@@ -45,6 +45,7 @@ before a PR is considered done.
 | Method | Path                | Notes                                   |
 | ------ | ------------------- | --------------------------------------- |
 | GET    | `/health`           | health probe                            |
+| POST   | `/api/auth/signup`  | register with email + password          |
 | POST   | `/api/auth/google`  | sign in with a Google ID token          |
 | GET    | `/api/auth/me`      | current user (requires session)         |
 | POST   | `/api/auth/logout`  | clear the session cookie                |
@@ -59,6 +60,14 @@ before a PR is considered done.
 
 ## Authentication
 
+All auth endpoints return the same shape — `{ token, user, created? }` — and
+`GET /api/auth/me` returns `{ user }`. `token` is the JWT (also set as an
+httpOnly cookie); `user` always has `id` and `email`.
+
+- **Email/password** (`POST /api/auth/signup`): body `{ email, password }`
+  (email trimmed + lowercased server-side; password min 8 chars, hashed with
+  bcrypt). `409` if the email already exists, `400` on validation. Creates a
+  `local`-provider account.
 - **Google sign-in** (`POST /api/auth/google`): the client obtains a Google ID
   token via Google Identity Services and posts `{ idToken }`. The backend
   verifies it (`google-auth-library`), finds-or-creates the user, and issues a
@@ -84,8 +93,8 @@ from Azure's proxy. Both limiters are skipped under `NODE_ENV=test`.
 
 ## Not yet implemented
 
-- **Email/password sign-up** (`bcrypt` is installed and the `passwordHash`
-  field exists; routes are next).
+- **Email/password login** (`POST /api/auth/login`) — signup exists; login is
+  the next step (same request/response shape, verify with bcrypt).
 - **Apple sign-in** — same verify-a-token pattern as Google; the
   `authProviders` model and `findOrCreateFromProvider` service already support
   it.

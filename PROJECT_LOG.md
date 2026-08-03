@@ -151,3 +151,59 @@ An **append-only** history of decisions, completed work, and open questions.
 
 ### 2026-07-24 · T-003 · Redis-backed rate limiting before scale-out
 - Depends on O-004.
+
+---
+
+### 2026-07-30 · X-003 · Email/password signup implemented
+- Added `POST /api/auth/signup` (body `{ email, password }`). Hashes with
+  bcrypt, creates a `local`-provider user, returns `{ token, user, created }`
+  and sets the cookie. 409 on duplicate email, 400 on validation. Rate-limited
+  via the strict auth limiter. Password min length 8; bcrypt cost via
+  `BCRYPT_ROUNDS` (default 12). Built from a FE-provided contract spec.
+- Why: first-class email/password path requested by the maintainer; matches
+  what the frontend client already sends/expects.
+- Refs: src/lib/password.js, src/services/authService.js (createLocalUser),
+  src/controllers/authController.js, src/routes/authRoutes.js
+- Fulfills: T-001. Partially resolves O-001 (signup done; login still open →
+  T-004).
+
+### 2026-07-30 · D-008 · Unified auth response shape across endpoints
+- All auth endpoints now return `{ token, user, created? }`; `GET /me` returns
+  `{ user }`. Changed `/google` (was `{ data: user, created, token }`) and
+  `/me` (was `{ data: user }`) to match.
+- Why: the FE treats all auth endpoints as one contract and its parser wants
+  `user.id`/`user.email` + optional `token`. One shape avoids brittle parsing.
+- Refs: src/controllers/authController.js (issueSession)
+
+### 2026-07-30 · D-009 · Email normalized by lowercase+trim only (not aggressive)
+- Server trims and lowercases the email; does NOT use `normalizeEmail()`.
+- Why: consistent lookups/dedupe without gmail dot-stripping or plus-tag
+  surprises that `normalizeEmail` would introduce.
+- Refs: src/routes/authRoutes.js, src/controllers/authController.js
+
+### 2026-07-30 · D-010 · passwordHash never serialized
+- `passwordHash` is `select:false` AND explicitly deleted in the User `toJSON`
+  transform (belt-and-braces).
+- Why: defense in depth so a hash can never leak in an API response even if a
+  query selects it.
+- Refs: src/models/User.js
+
+### 2026-07-30 · O-001 · UPDATE — password policy still open
+- Signup shipped (X-003) but the only rule is min length 8. Still to decide:
+  complexity requirements, email verification, and password reset flow.
+
+### 2026-07-30 · O-008 · Field-level validation error messages
+- Backend returns `{ error: { message, details[] } }`, but the FE currently
+  only surfaces the HTTP status ("Sign up failed (400)"). Showing per-field
+  messages is a FE change too.
+- Decide: whether/when to wire field-level errors end to end.
+
+### 2026-07-30 · T-004 · Build POST /api/auth/login (email/password)
+- FE already wired for it: same `{ email, password }` request, same
+  `{ token, user }` response. Verify with `verifyPassword`; 401 on bad creds.
+- Depends on X-003 (done). Natural next step.
+
+### 2026-07-30 · NOTE · PORT is already env-driven
+- Running on a different port needs no code change: `env.js` reads
+  `process.env.PORT` (default 3000). Set `PORT=3002` in `.env`.
+- Refs: src/config/env.js

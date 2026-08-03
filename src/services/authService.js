@@ -61,4 +61,22 @@ async function findOrCreateFromProvider(provider, profile) {
   return { user, created: true };
 }
 
-module.exports = { findOrCreateFromProvider, generateUniqueUsername };
+// Creates an email/password ("local") account. Caller supplies an already
+// hashed password. Username is generated from the email like social signups.
+async function createLocalUser({ email, passwordHash }) {
+  const username = await generateUniqueUsername(email);
+  return User.create({
+    username,
+    email: email.toLowerCase(),
+    displayName: username,
+    passwordHash,
+    emailVerified: false,
+    authProviders: [{ provider: 'local', providerId: null }],
+  });
+}
+
+module.exports = {
+  findOrCreateFromProvider,
+  generateUniqueUsername,
+  createLocalUser,
+};

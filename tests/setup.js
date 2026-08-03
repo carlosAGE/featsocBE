@@ -3,6 +3,8 @@
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-do-not-use';
 process.env.GOOGLE_CLIENT_ID =
   process.env.GOOGLE_CLIENT_ID || 'test-google-client-id.apps.googleusercontent.com';
+// Low bcrypt cost so password hashing doesn't slow the suite.
+process.env.BCRYPT_ROUNDS = process.env.BCRYPT_ROUNDS || '4';
 
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
