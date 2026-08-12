@@ -230,3 +230,53 @@ An **append-only** history of decisions, completed work, and open questions.
 - Observed: dev DB connected as `test` (not `featsoc`) — MONGODB_URI likely
   points at the default DB. Not changed (won't touch `.env`); flagged for
   maintainer.
+
+### 2026-08-12 · D-012 · Video storage: Cloudflare R2, backend-side ffmpeg normalize (no HLS pipeline yet)
+- Videos are stored in Cloudflare R2 (S3-compatible API). On upload, the
+  backend runs every file through ffmpeg to a single consistent H.264/AAC mp4
+  capped at 1080p / 4000kbps video, `+faststart` for progressive playback,
+  plus a jpg thumbnail grabbed at ~1s. No adaptive-bitrate/HLS transcoding.
+- Why: decided jointly with the frontend/maintainer thread as a cost
+  tradeoff. R2 has zero egress fees, which matters most for video bandwidth
+  with no users yet. Alternatives considered: Cloudflare Stream / Mux / Bunny
+  Stream (full pipelines, but cost scales immediately with no traffic to
+  justify it), plain S3 + CloudFront (real egress costs), Backblaze B2 +
+  Cloudflare CDN (viable, but more self-managed pipeline work). R2 wins on
+  "near-zero cost now, clear upgrade path later" — if/when adaptive bitrate
+  or a managed pipeline is needed, swap the storage layer without touching
+  the upload contract's shape.
+- Refs: src/lib/r2Client.js, src/services/videoProcessing.js,
+  src/controllers/videoController.js
+
+### 2026-08-12 · D-013 · Upload contract: single-shot multipart POST (not presigned/resumable)
+- `POST /api/videos` accepts `multipart/form-data` with a `file` field (video)
+  and optional `caption`, proxied through this server: multer -> disk temp
+  file -> ffmpeg normalize + thumbnail -> upload to R2 -> `Video` doc created
+  -> `201 { data: { id, url, thumbnailUrl, caption, durationSeconds, width,
+  height, sizeBytes, owner, createdAt } }`. 400 on missing/oversized/
+  unsupported file, 401 without a session.
+- Why (over presigned-URL direct upload): the ffmpeg normalize pass has to
+  happen backend-side regardless, which means the raw file has to reach the
+  server (or a two-phase presigned-raw-upload -> backend-fetch-and-process
+  dance) either way — for MVP traffic, one endpoint is simpler than
+  orchestrating a "pending upload" state machine. Frontend implication: no
+  native resumable/chunked retry — upload progress is whatever the client's
+  fetch/XHR gives for a single POST, and a failed upload is a full retry, not
+  a resume. `MAX_UPLOAD_MB` (default 200) caps request size before ffmpeg
+  ever runs.
+- Upgrade path (flagged, not built): once file sizes or concurrent upload
+  volume make proxying through the app server a bottleneck, switch to
+  presigned PUT direct-to-R2 for the raw file + a `POST /api/videos/:id/complete`
+  finalize step that triggers backend-side fetch-process-store. Contract
+  shape changes then; frontend would need to know before this is deferred
+  further.
+- Refs: src/routes/videoRoutes.js, src/controllers/videoController.js,
+  tests/videos.test.js
+
+### 2026-08-12 · O-002 · Still-open contracts flagged by frontend thread
+- Frontend asked us to also pin down: feed pagination shape, likes/comments
+  endpoints, follow/unfollow endpoints. None of these exist yet — flagged
+  back to the maintainer/frontend thread rather than guessed at here, since
+  each shapes frontend state management (see ROADMAP.md sections 3-4 for the
+  feature list these correspond to).
+- Refs: ROADMAP.md

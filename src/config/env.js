@@ -50,6 +50,23 @@ const env = {
     .split(',')
     .map((id) => id.trim())
     .filter(Boolean),
+
+  // --- Video storage (Cloudflare R2) ---
+  // R2 is S3-compatible; the client is pointed at the account's R2 endpoint.
+  // Not `required()` at module load so the rest of the app (and tests) can
+  // run without R2 configured — the video routes fail loudly if used without it.
+  r2AccountId: process.env.R2_ACCOUNT_ID,
+  r2AccessKeyId: process.env.R2_ACCESS_KEY_ID,
+  r2SecretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  r2Bucket: process.env.R2_BUCKET_NAME,
+  // Public base URL videos are served from — either the bucket's r2.dev
+  // subdomain or a custom domain mapped to it. No trailing slash.
+  r2PublicBaseUrl: (process.env.R2_PUBLIC_BASE_URL || '').replace(/\/+$/, ''),
+
+  // Max accepted upload size, in bytes, enforced by multer before ffmpeg
+  // ever runs.
+  maxUploadBytes:
+    parseInt(process.env.MAX_UPLOAD_MB || '200', 10) * 1024 * 1024,
 };
 
 module.exports = env;
