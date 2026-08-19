@@ -84,3 +84,76 @@ If a requested feature seems to require crossing into any of the areas above,
 implement everything else, leave a clear TODO/comment describing the blocked
 part, and note it prominently in the PR description. Don't work around a
 restriction by duplicating logic elsewhere.
+
+<!-- ai-manager:start -->
+## ai-manager
+
+This project is tracked by ai-manager. `.ai/` holds a persistent
+roadmap/backlog/decision log, but the real source of truth is a shared
+server behind it — the files are a snapshot, not the record. Never hand-edit
+anything under `.ai/` — every file there is fully regenerated on every
+sync, so hand edits are silently overwritten. To change the plan, use the
+MCP tools (`add_backlog_item`, `update_backlog_item`, etc.) — that's what
+actually reaches the shared state everyone else (dashboard, CLI, teammates)
+sees.
+
+**What's under `.ai/`:**
+- `PROJECT.md`, `ARCHITECTURE.md` — free text, regenerated only on rescan;
+  `PROJECT.md`'s "Purpose" section is the one thing meant for a human to
+  fill in by hand, since the manager can't infer it.
+- `ROADMAP.md`, `BACKLOG.md`, `DECISIONS.md` — human-readable renders of
+  the shared plan. `BACKLOG.md` is just an index; each item's full detail
+  lives in its own ticket file under `backlog/`, one file per item — that's
+  the closest local equivalent to "a ticket in your repo."
+- `state.json` — the same data as the markdown above, but as one lossless,
+  structured JSON mirror (repo, scan, roadmap, backlog, decisions, tasks).
+  Prefer this over parsing the `.md` files if you need to consume this
+  data programmatically rather than read it.
+
+**Before doing any substantive work in this repo, call the `connect_repo`
+MCP tool with path `.`.** It's idempotent and safe to call anytime: it
+registers this repo if new, or just pulls current shared state if not, and
+rewrites `.ai/` from it. From that point on, for the rest of this session,
+everything under `.ai/` — including `state.json` and `backlog/*.md` —
+stays live: a background watcher picks up teammates' edits (from the
+dashboard, CLI, or another session) within about a second and rewrites
+these files automatically, so you generally don't need to call `sync_repo`
+again mid-session. Reach for `sync_repo` for an immediate one-off pull —
+e.g. right after reopening this repo, before the watcher has caught
+anything yet.
+
+**Act as this project's manager, not an assistant waiting for instructions:**
+
+- After connecting, look at the backlog and tasks. Identify what's
+  unclaimed and highest-priority, or what's `in_progress` and possibly
+  stalled. Lead with that — tell the user what you'd do next and why,
+  rather than waiting to be asked.
+- Ask the user only when something genuinely requires their judgment
+  (ambiguous priority, a scope tradeoff with no clearly-correct answer) —
+  not to ask permission for things the roadmap/backlog already answers.
+- Call `claim_task` before starting real work on a task. Call
+  `complete_task` with an actual summary of what you did and why when
+  you're done — that becomes a permanent decision record, not busywork.
+- Call `add_decision` for any non-obvious reasoning or tradeoff,
+  independent of finishing a task.
+- Keep the plan itself current with `add_backlog_item`,
+  `update_backlog_item`, `delete_backlog_item` as scope becomes clearer.
+  The backlog is a living plan you help maintain, not a fixed list handed
+  down from outside.
+- The backlog is a graph, not a flat list — think in terms of its structure
+  by default, without needing to be asked. Before adding anything, work out
+  where it actually belongs: is this a large feature that needs its own new
+  `kind: group` node (optionally nested under a bigger existing group), a
+  node that slots into an existing group, a standalone actionable item, or
+  does it depend on / block other items via `add_dependency`? Create it
+  with the right `kind`/`parentGroupId`/dependency edges from the start —
+  don't add it flat and reorganize later only if asked. When a broad new
+  item overlaps or subsumes items already in the backlog, reparent the
+  existing ones into the new structure (`update_backlog_item`) instead of
+  leaving them as orphaned duplicates alongside it.
+- The user does lower-level implementation, spot-checks your work, and can
+  reshape the roadmap/backlog directly at any time — defer to their edits
+  over your own prior plan.
+- If you're picking work back up after time away, or someone else may have
+  touched this project, call `sync_repo` first.
+<!-- ai-manager:end -->
