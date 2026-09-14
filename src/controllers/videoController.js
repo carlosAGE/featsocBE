@@ -12,6 +12,7 @@ const { uploadFile, deleteFile } = require('../lib/r2Client');
 const { probe, normalize, generateThumbnail } = require('../services/videoProcessing');
 const { getLikedVideoIdSet } = require('./likeController');
 const { containsBannedContent } = require('../lib/contentFilter');
+const { extractHashtags } = require('../lib/hashtags');
 
 const asyncHandler = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
@@ -73,9 +74,13 @@ const uploadVideo = asyncHandler(async (req, res) => {
       'image/jpeg'
     );
 
+    const caption = req.body.caption || '';
     const video = await Video.create({
       owner: req.user.id,
-      caption: req.body.caption || '',
+      caption,
+      hashtags: extractHashtags(caption),
+      soundCredit: req.body.soundCredit || 'Original sound',
+      privacy: req.body.privacy === 'private' ? 'private' : 'public',
       key: videoKey,
       url: videoUrl,
       thumbnailKey,
@@ -105,8 +110,39 @@ const getVideo = asyncHandler(async (req, res) => {
   ).populate('owner', 'username displayName avatarUrl');
   if (!video) throw new ApiError(404, 'Video not found');
 
+  // A private video 404s for anyone but its owner — same as a nonexistent
+  // video, so a direct link doesn't confirm existence either way.
+  if (video.privacy === 'private' && String(video.owner.id) !== String(req.user?.id)) {
+    throw new ApiError(404, 'Video not found');
+  }
+
   const likedSet = await getLikedVideoIdSet(req.user?.id, [video.id]);
   res.json({ data: { ...video.toJSON(), isLiked: likedSet.has(video.id) } });
+});
+
+// PATCH /api/videos/:id  (requires auth + ownership)
+// body: { caption?, privacy? }
+const updateVideo = asyncHandler(async (req, res) => {
+  const video = await Video.findById(req.params.id);
+  if (!video) throw new ApiError(404, 'Video not found');
+  if (String(video.owner) !== String(req.user.id)) {
+    throw new ApiError(403, 'You can only edit your own videos');
+  }
+
+  if (typeof req.body.caption === 'string') {
+    if (containsBannedContent(req.body.caption)) {
+      throw new ApiError(400, 'Caption violates community guidelines');
+    }
+    video.caption = req.body.caption;
+    video.hashtags = extractHashtags(req.body.caption);
+  }
+  if (req.body.privacy === 'public' || req.body.privacy === 'private') {
+    video.privacy = req.body.privacy;
+  }
+
+  await video.save();
+  await video.populate('owner', 'username displayName avatarUrl');
+  res.json({ data: { ...video.toJSON(), isLiked: false } });
 });
 
 // DELETE /api/videos/:id  (requires auth + ownership)
@@ -145,7 +181,11 @@ const listVideosByOwner = asyncHandler(async (req, res) => {
   }
 
   const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
+  const isOwnerViewing = String(owner.id) === String(req.user?.id);
   const filter = { owner: req.params.id };
+  if (!isOwnerViewing) {
+    filter.privacy = 'public';
+  }
   if (req.query.cursor) {
     filter.createdAt = { $lt: new Date(req.query.cursor) };
   }
@@ -161,4 +201,32 @@ const listVideosByOwner = asyncHandler(async (req, res) => {
   res.json({ data: videos, count: videos.length, nextCursor });
 });
 
-module.exports = { asyncHandler, uploadVideo, getVideo, deleteVideo, listVideosByOwner };
+// GET /api/hashtags/:tag/videos?cursor=&limit=  (public)
+const listVideosByHashtag = asyncHandler(async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
+  const tag = req.params.tag.toLowerCase();
+  const filter = { hashtags: tag, privacy: 'public' };
+  if (req.query.cursor) {
+    filter.createdAt = { $lt: new Date(req.query.cursor) };
+  }
+
+  const videos = await Video.find(filter)
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .populate('owner', 'username displayName avatarUrl');
+
+  const nextCursor =
+    videos.length === limit ? videos[videos.length - 1].createdAt.toISOString() : null;
+
+  res.json({ data: videos, count: videos.length, nextCursor });
+});
+
+module.exports = {
+  asyncHandler,
+  uploadVideo,
+  getVideo,
+  updateVideo,
+  deleteVideo,
+  listVideosByOwner,
+  listVideosByHashtag,
+};

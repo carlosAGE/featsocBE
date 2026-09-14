@@ -16,6 +16,12 @@ let mongo;
 beforeAll(async () => {
   mongo = await MongoMemoryServer.create();
   await mongoose.connect(mongo.getUri());
+  // Mongoose builds each model's indexes in the background after connecting
+  // — it doesn't block connect() on them. A $text query issued before its
+  // text index finishes building fails outright, so wait for every
+  // already-registered model (everything the test file required at the
+  // top) to finish before any test runs.
+  await Promise.all(mongoose.modelNames().map((name) => mongoose.model(name).init()));
 });
 
 afterEach(async () => {

@@ -48,12 +48,28 @@ router.post(
   '/',
   requireAuth,
   handleUpload,
-  [body('caption').optional().isString().trim().isLength({ max: 2200 })],
+  [
+    body('caption').optional().isString().trim().isLength({ max: 2200 }),
+    body('soundCredit').optional().isString().trim().isLength({ max: 100 }),
+    body('privacy').optional().isIn(['public', 'private']),
+  ],
   validate,
   ctrl.uploadVideo
 );
 
 router.get('/:id', attachUser, [param('id').isMongoId()], validate, ctrl.getVideo);
+
+router.patch(
+  '/:id',
+  requireAuth,
+  [
+    param('id').isMongoId(),
+    body('caption').optional().isString().trim().isLength({ max: 2200 }),
+    body('privacy').optional().isIn(['public', 'private']),
+  ],
+  validate,
+  ctrl.updateVideo
+);
 
 router.delete(
   '/:id',

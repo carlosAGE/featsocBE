@@ -71,6 +71,37 @@ describe('Videos API', () => {
     expect(data.thumbnailKey).toBeUndefined();
   });
 
+  it('parses hashtags out of the caption and defaults soundCredit/privacy', async () => {
+    const { cookie } = await makeUserWithSession();
+
+    const res = await request(app)
+      .post('/api/videos')
+      .set('Cookie', cookie)
+      .field('caption', 'having fun #Beach #sunset #Beach')
+      .attach('file', fixturePath);
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.hashtags).toEqual(['beach', 'sunset']);
+    expect(res.body.data.soundCredit).toBe('Original sound');
+    expect(res.body.data.privacy).toBe('public');
+  });
+
+  it('accepts an explicit soundCredit and privacy on upload', async () => {
+    const { cookie } = await makeUserWithSession();
+
+    const res = await request(app)
+      .post('/api/videos')
+      .set('Cookie', cookie)
+      .field('caption', 'no tags here')
+      .field('soundCredit', 'Some Song - Some Artist')
+      .field('privacy', 'private')
+      .attach('file', fixturePath);
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.soundCredit).toBe('Some Song - Some Artist');
+    expect(res.body.data.privacy).toBe('private');
+  });
+
   it('rejects an upload without a session (401)', async () => {
     const res = await request(app).post('/api/videos').attach('file', fixturePath);
     expect(res.status).toBe(401);
