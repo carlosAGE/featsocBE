@@ -1,13 +1,15 @@
 const express = require('express');
 const multer = require('multer');
 const os = require('os');
-const { body, param } = require('express-validator');
+const { body, param, query } = require('express-validator');
 
 const { validate } = require('../middleware/validate');
 const { requireAuth } = require('../middleware/auth');
 const { ApiError } = require('../middleware/error');
 const env = require('../config/env');
 const ctrl = require('../controllers/videoController');
+const likeCtrl = require('../controllers/likeController');
+const commentCtrl = require('../controllers/commentController');
 
 const router = express.Router();
 
@@ -59,6 +61,46 @@ router.delete(
   [param('id').isMongoId()],
   validate,
   ctrl.deleteVideo
+);
+
+router.post(
+  '/:id/like',
+  requireAuth,
+  [param('id').isMongoId()],
+  validate,
+  likeCtrl.likeVideo
+);
+
+router.delete(
+  '/:id/like',
+  requireAuth,
+  [param('id').isMongoId()],
+  validate,
+  likeCtrl.unlikeVideo
+);
+
+const paginationValidators = [
+  query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
+  query('cursor').optional().isISO8601(),
+];
+
+router.get(
+  '/:id/comments',
+  [param('id').isMongoId(), ...paginationValidators],
+  validate,
+  commentCtrl.listComments
+);
+
+router.post(
+  '/:id/comments',
+  requireAuth,
+  [
+    param('id').isMongoId(),
+    body('content').isString().trim().isLength({ min: 1, max: 500 }),
+    body('parentCommentId').optional().isMongoId(),
+  ],
+  validate,
+  commentCtrl.createComment
 );
 
 module.exports = router;

@@ -68,6 +68,20 @@ const userSchema = new mongoose.Schema(
       type: [authProviderSchema],
       default: [],
     },
+
+    // --- Denormalized social-graph counters (additive) ---
+    // Kept here so profile screens don't need a Follow collection count per
+    // request. Updated by the follow/unfollow code path.
+    followerCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    followingCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   { timestamps: true }
 );

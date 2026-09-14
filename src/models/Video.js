@@ -40,11 +40,38 @@ const videoSchema = new mongoose.Schema(
       type: Number,
       min: 0,
     },
+
+    // --- Denormalized engagement counters (additive) ---
+    // Kept on the video doc so the feed can rank/display without a join per
+    // request. Updated by the like/comment/view code paths, never computed
+    // live from the Like/Comment collections on read.
+    likeCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    commentCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    viewCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    shareCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   { timestamps: true }
 );
 
 videoSchema.index({ owner: 1, createdAt: -1 });
+// Powers the global "For You" feed's cursor pagination.
+videoSchema.index({ createdAt: -1 });
 
 videoSchema.set('toJSON', {
   virtuals: true,

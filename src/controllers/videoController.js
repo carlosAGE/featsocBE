@@ -86,11 +86,16 @@ const uploadVideo = asyncHandler(async (req, res) => {
 });
 
 // GET /api/videos/:id
+//
+// MVP view counting: every fetch of the detail view counts as a view, no
+// dedup/session tracking yet. Simple and honest for now; revisit if view
+// count needs to be gamed-resistant later.
 const getVideo = asyncHandler(async (req, res) => {
-  const video = await Video.findById(req.params.id).populate(
-    'owner',
-    'username displayName avatarUrl'
-  );
+  const video = await Video.findByIdAndUpdate(
+    req.params.id,
+    { $inc: { viewCount: 1 } },
+    { new: true }
+  ).populate('owner', 'username displayName avatarUrl');
   if (!video) throw new ApiError(404, 'Video not found');
   res.json({ data: video });
 });
@@ -111,4 +116,23 @@ const deleteVideo = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
-module.exports = { asyncHandler, uploadVideo, getVideo, deleteVideo };
+// GET /api/users/:id/videos?cursor=&limit=  (public — profile grid)
+const listVideosByOwner = asyncHandler(async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
+  const filter = { owner: req.params.id };
+  if (req.query.cursor) {
+    filter.createdAt = { $lt: new Date(req.query.cursor) };
+  }
+
+  const videos = await Video.find(filter)
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .populate('owner', 'username displayName avatarUrl');
+
+  const nextCursor =
+    videos.length === limit ? videos[videos.length - 1].createdAt.toISOString() : null;
+
+  res.json({ data: videos, count: videos.length, nextCursor });
+});
+
+module.exports = { asyncHandler, uploadVideo, getVideo, deleteVideo, listVideosByOwner };
