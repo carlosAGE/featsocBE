@@ -67,6 +67,20 @@ describe('Users API', () => {
     expect(viewerRes.body.data.isFollowing).toBe(true);
   });
 
+  it('defaults isBlocked to false with no viewer, true once the viewer blocks', async () => {
+    const created = await request(app).post('/api/users').send(valid);
+    const { id } = created.body.data;
+
+    const anonRes = await request(app).get(`/api/users/${id}`);
+    expect(anonRes.body.data.isBlocked).toBe(false);
+
+    const { cookie } = await makeUserWithSession();
+    await request(app).post(`/api/users/${id}/block`).set('Cookie', cookie);
+
+    const viewerRes = await request(app).get(`/api/users/${id}`).set('Cookie', cookie);
+    expect(viewerRes.body.data.isBlocked).toBe(true);
+  });
+
   it('lets a user edit their own profile', async () => {
     const { user, cookie } = await makeUserWithSession();
 

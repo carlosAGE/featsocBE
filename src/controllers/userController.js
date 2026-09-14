@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Follow = require('../models/Follow');
+const Block = require('../models/Block');
 const { asyncHandler } = require('./postController');
 const { ApiError } = require('../middleware/error');
 
@@ -12,19 +13,24 @@ const listUsers = asyncHandler(async (req, res) => {
 
 // GET /api/users/:id
 //
-// isFollowing reflects the signed-in viewer, if any (attachUser is a soft
-// gate — this route stays public), same pattern as isLiked on videos.
+// isFollowing/isBlocked reflect the signed-in viewer, if any (attachUser is
+// a soft gate — this route stays public), same pattern as isLiked on videos.
 const getUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) throw new ApiError(404, 'User not found');
 
   let isFollowing = false;
+  let isBlocked = false;
   if (req.user) {
-    const edge = await Follow.findOne({ follower: req.user.id, following: user.id });
-    isFollowing = Boolean(edge);
+    const [followEdge, blockEdge] = await Promise.all([
+      Follow.findOne({ follower: req.user.id, following: user.id }),
+      Block.findOne({ blocker: req.user.id, blocked: user.id }),
+    ]);
+    isFollowing = Boolean(followEdge);
+    isBlocked = Boolean(blockEdge);
   }
 
-  res.json({ data: { ...user.toJSON(), isFollowing } });
+  res.json({ data: { ...user.toJSON(), isFollowing, isBlocked } });
 });
 
 // POST /api/users
@@ -60,7 +66,7 @@ const updateUser = asyncHandler(async (req, res) => {
   if (typeof req.body.isPrivate === 'boolean') user.isPrivate = req.body.isPrivate;
 
   await user.save();
-  res.json({ data: { ...user.toJSON(), isFollowing: false } });
+  res.json({ data: { ...user.toJSON(), isFollowing: false, isBlocked: false } });
 });
 
 module.exports = { listUsers, getUser, createUser, updateUser };
