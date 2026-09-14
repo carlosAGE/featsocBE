@@ -50,4 +50,26 @@ router.post(
 router.get('/me', requireAuth, ctrl.me);
 router.post('/logout', ctrl.logout);
 
+router.post(
+  '/forgot-password',
+  authLimiter,
+  [body('email').trim().isEmail().withMessage('A valid email is required')],
+  validate,
+  ctrl.forgotPassword
+);
+
+router.post(
+  '/reset-password',
+  authLimiter,
+  [
+    body('token').isString().trim().notEmpty(),
+    body('password')
+      .isString()
+      .isLength({ min: 8 })
+      .withMessage('Password must be at least 8 characters'),
+  ],
+  validate,
+  ctrl.resetPassword
+);
+
 module.exports = router;

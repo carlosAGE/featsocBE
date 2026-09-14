@@ -2,13 +2,18 @@ const rateLimit = require('express-rate-limit');
 const env = require('../config/env');
 const { ApiError } = require('./error');
 
-// Rate limiting / abuse prevention. Two tiers:
-//   - apiLimiter:  a generous global cap on every /api request
-//   - authLimiter: a tight cap on auth endpoints (sign-in is a prime target
-//                  for credential-stuffing / token-guessing abuse)
+// Rate limiting / abuse prevention. Three tiers:
+//   - apiLimiter:    a generous global cap on every /api request
+//   - authLimiter:   a tight cap on auth endpoints (sign-in is a prime
+//                    target for credential-stuffing / token-guessing abuse)
+//   - uploadLimiter: a tighter cap specifically on video upload — each
+//                    upload is expensive (ffmpeg normalize + R2 storage),
+//                    so it needs its own stricter budget beyond the global
+//                    per-IP cap.
 //
-// Both are skipped under NODE_ENV=test so the suite stays deterministic; the
-// factory itself is exercised directly in tests/rateLimit.test.js.
+// All three are skipped under NODE_ENV=test so the suite stays
+// deterministic; the factory itself is exercised directly in
+// tests/rateLimit.test.js.
 
 function createRateLimiter({ windowMs, max, message, skip }) {
   return rateLimit({
@@ -44,4 +49,12 @@ const authLimiter = createRateLimiter({
   skip: skipInTest,
 });
 
-module.exports = { createRateLimiter, apiLimiter, authLimiter };
+// Upload: 20 uploads / hour / IP.
+const uploadLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  message: 'Too many uploads, please try again later.',
+  skip: skipInTest,
+});
+
+module.exports = { createRateLimiter, apiLimiter, authLimiter, uploadLimiter };

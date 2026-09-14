@@ -69,6 +69,21 @@ const userSchema = new mongoose.Schema(
       default: [],
     },
 
+    // Password reset — a sha256 hash of a one-time random token (the raw
+    // token is never stored), plus its expiry. Reusing bcrypt here would be
+    // needless cost: this token is already high-entropy random bytes, not a
+    // user-chosen password. select:false, same as passwordHash.
+    resetPasswordTokenHash: {
+      type: String,
+      select: false,
+      default: undefined,
+    },
+    resetPasswordExpires: {
+      type: Date,
+      select: false,
+      default: undefined,
+    },
+
     // --- Denormalized social-graph counters (additive) ---
     // Kept here so profile screens don't need a Follow collection count per
     // request. Updated by the follow/unfollow code path.

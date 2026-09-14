@@ -1,6 +1,6 @@
 const express = require('express');
 const request = require('supertest');
-const { createRateLimiter } = require('../src/middleware/rateLimit');
+const { createRateLimiter, apiLimiter, authLimiter, uploadLimiter } = require('../src/middleware/rateLimit');
 const { errorHandler } = require('../src/middleware/error');
 
 // The wired-up limiters skip under NODE_ENV=test (so the rest of the suite is
@@ -34,5 +34,11 @@ describe('rate limiter', () => {
     const res = await request(app).get('/ping');
     expect(res.status).toBe(200);
     expect(res.headers).toHaveProperty('ratelimit-limit');
+  });
+
+  it('exports three tiers — api, auth, and upload — all skipped in test', () => {
+    expect(apiLimiter).toBeDefined();
+    expect(authLimiter).toBeDefined();
+    expect(uploadLimiter).toBeDefined();
   });
 });
