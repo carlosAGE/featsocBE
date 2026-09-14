@@ -2,7 +2,7 @@ const express = require('express');
 const { body, param, query } = require('express-validator');
 
 const { validate } = require('../middleware/validate');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, attachUser } = require('../middleware/auth');
 const ctrl = require('../controllers/userController');
 const followCtrl = require('../controllers/followController');
 const videoCtrl = require('../controllers/videoController');
@@ -23,6 +23,7 @@ router.get(
 
 router.get(
   '/:id',
+  attachUser,
   [param('id').isMongoId()],
   validate,
   ctrl.getUser

@@ -1,5 +1,6 @@
 const request = require('supertest');
 const createApp = require('../src/app');
+const { makeUserWithSession } = require('./helpers');
 
 const app = createApp();
 
@@ -50,5 +51,19 @@ describe('Users API', () => {
     const one = await request(app).get(`/api/users/${id}`);
     expect(one.status).toBe(200);
     expect(one.body.data.username).toBe('alice');
+  });
+
+  it('defaults isFollowing to false with no viewer, true once the viewer follows', async () => {
+    const created = await request(app).post('/api/users').send(valid);
+    const { id } = created.body.data;
+
+    const anonRes = await request(app).get(`/api/users/${id}`);
+    expect(anonRes.body.data.isFollowing).toBe(false);
+
+    const { cookie } = await makeUserWithSession();
+    await request(app).post(`/api/users/${id}/follow`).set('Cookie', cookie);
+
+    const viewerRes = await request(app).get(`/api/users/${id}`).set('Cookie', cookie);
+    expect(viewerRes.body.data.isFollowing).toBe(true);
   });
 });
