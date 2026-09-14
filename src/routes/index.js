@@ -8,6 +8,8 @@ const feedRoutes = require('./feedRoutes');
 const commentRoutes = require('./commentRoutes');
 const notificationRoutes = require('./notificationRoutes');
 const reportRoutes = require('./reportRoutes');
+const hashtagRoutes = require('./hashtagRoutes');
+const searchRoutes = require('./searchRoutes');
 
 // Aggregates all feature routers under /api (mounted in app.js)
 // New features add one line here plus their own routes/controller/model/test.
@@ -21,5 +23,7 @@ router.use('/feed', feedRoutes);
 router.use('/comments', commentRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/reports', reportRoutes);
+router.use('/hashtags', hashtagRoutes);
+router.use('/search', searchRoutes);
 
 module.exports = router;

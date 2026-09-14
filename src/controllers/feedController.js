@@ -51,7 +51,9 @@ async function getExcludedOwnerIds(viewerId) {
 // stays stable while new videos land mid-scroll (no offset/skip-limit).
 const getForYouFeed = asyncHandler(async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
-  const filter = {};
+  // Private videos never surface in either feed — they're only reachable
+  // from the owner's own profile, same as TikTok.
+  const filter = { privacy: 'public' };
   if (req.query.cursor) {
     filter.createdAt = { $lt: new Date(req.query.cursor) };
   }
@@ -95,7 +97,7 @@ const getFollowingFeed = asyncHandler(async (req, res) => {
     return res.json({ data: [], count: 0, nextCursor: null });
   }
 
-  const filter = { owner: { $in: followingIds } };
+  const filter = { owner: { $in: followingIds }, privacy: 'public' };
   if (req.query.cursor) {
     filter.createdAt = { $lt: new Date(req.query.cursor) };
   }
