@@ -1,7 +1,9 @@
+const User = require('../models/User');
 const Video = require('../models/Video');
 const Follow = require('../models/Follow');
 const { asyncHandler } = require('./postController');
 const { getLikedVideoIdSet } = require('./likeController');
+const { getBlockedUserIds } = require('./blockController');
 
 const OWNER_FIELDS = 'username displayName avatarUrl';
 
@@ -10,6 +12,31 @@ const OWNER_FIELDS = 'username displayName avatarUrl';
 async function withLikedState(videos, viewerId) {
   const likedSet = await getLikedVideoIdSet(viewerId, videos.map((v) => v.id));
   return videos.map((v) => ({ ...v.toJSON(), isLiked: likedSet.has(v.id) }));
+}
+
+// Owners whose videos should never appear in this viewer's "For You" feed:
+// anyone the viewer has blocked, plus private accounts the viewer doesn't
+// follow (and isn't themself). Following feed doesn't need this — by
+// definition it only shows people the viewer already follows.
+async function getExcludedOwnerIds(viewerId) {
+  const blocked = await getBlockedUserIds(viewerId);
+
+  const privateUsers = await User.find({ isPrivate: true }).select('_id');
+  if (privateUsers.length === 0) return blocked;
+  const privateIds = privateUsers.map((u) => String(u._id));
+
+  if (!viewerId) return [...blocked, ...privateIds];
+
+  const following = await Follow.find({
+    follower: viewerId,
+    following: { $in: privateIds },
+  }).select('following');
+  const followingSet = new Set(following.map((f) => String(f.following)));
+
+  const excludedPrivate = privateIds.filter(
+    (id) => id !== String(viewerId) && !followingSet.has(id)
+  );
+  return [...blocked, ...excludedPrivate];
 }
 
 // GET /api/feed?cursor=&limit=
@@ -27,6 +54,11 @@ const getForYouFeed = asyncHandler(async (req, res) => {
   const filter = {};
   if (req.query.cursor) {
     filter.createdAt = { $lt: new Date(req.query.cursor) };
+  }
+
+  const excludedOwnerIds = await getExcludedOwnerIds(req.user?.id);
+  if (excludedOwnerIds.length > 0) {
+    filter.owner = { $nin: excludedOwnerIds };
   }
 
   const videos = await Video.find(filter)
@@ -48,8 +80,16 @@ const getForYouFeed = asyncHandler(async (req, res) => {
 const getFollowingFeed = asyncHandler(async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
 
-  const follows = await Follow.find({ follower: req.user.id }).select('following');
-  const followingIds = follows.map((f) => f.following);
+  const [follows, blockedIds] = await Promise.all([
+    Follow.find({ follower: req.user.id }).select('following'),
+    getBlockedUserIds(req.user.id),
+  ]);
+  const blockedSet = new Set(blockedIds);
+  // Following someone doesn't imply unblocking them if you'd previously
+  // blocked them — blocking always wins.
+  const followingIds = follows
+    .map((f) => f.following)
+    .filter((id) => !blockedSet.has(String(id)));
 
   if (followingIds.length === 0) {
     return res.json({ data: [], count: 0, nextCursor: null });

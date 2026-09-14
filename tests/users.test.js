@@ -66,4 +66,54 @@ describe('Users API', () => {
     const viewerRes = await request(app).get(`/api/users/${id}`).set('Cookie', cookie);
     expect(viewerRes.body.data.isFollowing).toBe(true);
   });
+
+  it('lets a user edit their own profile', async () => {
+    const { user, cookie } = await makeUserWithSession();
+
+    const res = await request(app)
+      .patch(`/api/users/${user.id}`)
+      .set('Cookie', cookie)
+      .send({ displayName: 'New Name', bio: 'updated bio', avatarUrl: 'https://example.com/a.png' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.displayName).toBe('New Name');
+    expect(res.body.data.bio).toBe('updated bio');
+    expect(res.body.data.avatarUrl).toBe('https://example.com/a.png');
+  });
+
+  it('requires auth to edit a profile', async () => {
+    const { user } = await makeUserWithSession();
+    const res = await request(app).patch(`/api/users/${user.id}`).send({ displayName: 'Nope' });
+    expect(res.status).toBe(401);
+  });
+
+  it("forbids editing someone else's profile (403)", async () => {
+    const { user: target } = await makeUserWithSession();
+    const { cookie: otherCookie } = await makeUserWithSession();
+
+    const res = await request(app)
+      .patch(`/api/users/${target.id}`)
+      .set('Cookie', otherCookie)
+      .send({ displayName: 'Hijacked' });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects a bio over the length limit', async () => {
+    const { user, cookie } = await makeUserWithSession();
+    const res = await request(app)
+      .patch(`/api/users/${user.id}`)
+      .set('Cookie', cookie)
+      .send({ bio: 'x'.repeat(281) });
+    expect(res.status).toBe(400);
+  });
+
+  it('lets a user toggle their account private', async () => {
+    const { user, cookie } = await makeUserWithSession();
+    const res = await request(app)
+      .patch(`/api/users/${user.id}`)
+      .set('Cookie', cookie)
+      .send({ isPrivate: true });
+    expect(res.status).toBe(200);
+    expect(res.body.data.isPrivate).toBe(true);
+  });
 });

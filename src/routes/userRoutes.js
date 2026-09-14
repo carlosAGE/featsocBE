@@ -6,6 +6,7 @@ const { requireAuth, attachUser } = require('../middleware/auth');
 const ctrl = require('../controllers/userController');
 const followCtrl = require('../controllers/followController');
 const videoCtrl = require('../controllers/videoController');
+const blockCtrl = require('../controllers/blockController');
 
 const router = express.Router();
 
@@ -42,6 +43,20 @@ router.post(
   ctrl.createUser
 );
 
+router.patch(
+  '/:id',
+  requireAuth,
+  [
+    param('id').isMongoId(),
+    body('displayName').optional().isString().trim().isLength({ max: 60 }),
+    body('bio').optional().isString().isLength({ max: 280 }),
+    body('avatarUrl').optional().isURL(),
+    body('isPrivate').optional().isBoolean().toBoolean(),
+  ],
+  validate,
+  ctrl.updateUser
+);
+
 router.post(
   '/:id/follow',
   requireAuth,
@@ -74,9 +89,26 @@ router.get(
 
 router.get(
   '/:id/videos',
+  attachUser,
   [param('id').isMongoId(), ...paginationValidators],
   validate,
   videoCtrl.listVideosByOwner
+);
+
+router.post(
+  '/:id/block',
+  requireAuth,
+  [param('id').isMongoId()],
+  validate,
+  blockCtrl.blockUser
+);
+
+router.delete(
+  '/:id/block',
+  requireAuth,
+  [param('id').isMongoId()],
+  validate,
+  blockCtrl.unblockUser
 );
 
 module.exports = router;

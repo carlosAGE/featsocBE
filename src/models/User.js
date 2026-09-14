@@ -82,6 +82,16 @@ const userSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+
+    // When true, video listing endpoints hide this user's videos from
+    // anyone who isn't the owner or an existing follower (see
+    // videoController.listVideosByOwner and feedController's exclusion
+    // query). Follow itself stays unapproved/immediate — this gates
+    // content visibility, not who can follow.
+    isPrivate: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

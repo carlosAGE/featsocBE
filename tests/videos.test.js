@@ -82,6 +82,16 @@ describe('Videos API', () => {
     expect(res.status).toBe(400);
   });
 
+  it('rejects a caption that fails the content filter (400)', async () => {
+    const { cookie } = await makeUserWithSession();
+    const res = await request(app)
+      .post('/api/videos')
+      .set('Cookie', cookie)
+      .field('caption', 'this is such bullshit')
+      .attach('file', fixturePath);
+    expect(res.status).toBe(400);
+  });
+
   it('rejects an unsupported file type (400)', async () => {
     const { cookie } = await makeUserWithSession();
     const res = await request(app)

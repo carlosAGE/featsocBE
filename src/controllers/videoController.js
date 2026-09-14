@@ -5,10 +5,13 @@ const path = require('path');
 const crypto = require('crypto');
 
 const Video = require('../models/Video');
+const User = require('../models/User');
+const Follow = require('../models/Follow');
 const { ApiError } = require('../middleware/error');
 const { uploadFile, deleteFile } = require('../lib/r2Client');
 const { probe, normalize, generateThumbnail } = require('../services/videoProcessing');
 const { getLikedVideoIdSet } = require('./likeController');
+const { containsBannedContent } = require('../lib/contentFilter');
 
 const asyncHandler = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
@@ -32,6 +35,9 @@ async function cleanup(paths) {
 // the MVP.
 const uploadVideo = asyncHandler(async (req, res) => {
   if (!req.file) throw new ApiError(400, 'A video file is required (field name "file")');
+  if (containsBannedContent(req.body.caption)) {
+    throw new ApiError(400, 'Caption violates community guidelines');
+  }
 
   const rawPath = req.file.path;
   const id = crypto.randomUUID();
@@ -119,8 +125,25 @@ const deleteVideo = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
-// GET /api/users/:id/videos?cursor=&limit=  (public — profile grid)
+// GET /api/users/:id/videos?cursor=&limit=  (public route, but gated —
+// see below)
+//
+// A private account's videos are hidden from anyone who isn't the owner or
+// an existing follower. attachUser is a soft gate so this stays a public
+// route for non-private accounts.
 const listVideosByOwner = asyncHandler(async (req, res) => {
+  const owner = await User.findById(req.params.id).select('isPrivate');
+  if (!owner) throw new ApiError(404, 'User not found');
+
+  if (owner.isPrivate && String(owner.id) !== String(req.user?.id)) {
+    const isFollower = req.user
+      ? Boolean(await Follow.findOne({ follower: req.user.id, following: owner.id }))
+      : false;
+    if (!isFollower) {
+      return res.json({ data: [], count: 0, nextCursor: null, private: true });
+    }
+  }
+
   const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
   const filter = { owner: req.params.id };
   if (req.query.cursor) {

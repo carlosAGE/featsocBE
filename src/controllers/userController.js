@@ -42,4 +42,25 @@ const createUser = asyncHandler(async (req, res) => {
   res.status(201).json({ data: user });
 });
 
-module.exports = { listUsers, getUser, createUser };
+// PATCH /api/users/:id  (requires auth + ownership)
+//
+// Only profile-display fields are editable here — username/email (unique,
+// identity-bearing) and anything auth-related are out of scope for this
+// route by design, not just by omission.
+const updateUser = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+  if (!user) throw new ApiError(404, 'User not found');
+  if (String(user.id) !== String(req.user.id)) {
+    throw new ApiError(403, 'You can only edit your own profile');
+  }
+
+  if (typeof req.body.displayName === 'string') user.displayName = req.body.displayName;
+  if (typeof req.body.bio === 'string') user.bio = req.body.bio;
+  if (typeof req.body.avatarUrl === 'string') user.avatarUrl = req.body.avatarUrl;
+  if (typeof req.body.isPrivate === 'boolean') user.isPrivate = req.body.isPrivate;
+
+  await user.save();
+  res.json({ data: { ...user.toJSON(), isFollowing: false } });
+});
+
+module.exports = { listUsers, getUser, createUser, updateUser };
