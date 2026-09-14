@@ -65,7 +65,7 @@ const googleSignIn = asyncHandler(async (req, res) => {
   let profile;
   try {
     profile = await verifyGoogleIdToken(idToken);
-  } catch (err) {
+  } catch {
     throw new ApiError(401, 'Invalid Google token');
   }
 

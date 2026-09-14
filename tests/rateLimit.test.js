@@ -19,7 +19,6 @@ describe('rate limiter', () => {
     const app = buildApp(3);
 
     for (let i = 0; i < 3; i += 1) {
-      // eslint-disable-next-line no-await-in-loop
       const ok = await request(app).get('/ping');
       expect(ok.status).toBe(200);
     }

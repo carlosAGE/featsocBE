@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npm run lint
+      # `npm test` already sets NODE_ENV=test itself (see package.json), and
+      # tests/setup.js supplies its own throwaway JWT_SECRET/GOOGLE_CLIENT_ID
+      # defaults — no env vars or secrets needed here.
+      - run: npm test
