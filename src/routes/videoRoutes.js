@@ -6,6 +6,7 @@ const { body, param, query } = require('express-validator');
 const { validate } = require('../middleware/validate');
 const { requireAuth, attachUser } = require('../middleware/auth');
 const { ApiError } = require('../middleware/error');
+const { uploadLimiter } = require('../middleware/rateLimit');
 const env = require('../config/env');
 const ctrl = require('../controllers/videoController');
 const likeCtrl = require('../controllers/likeController');
@@ -47,6 +48,7 @@ function handleUpload(req, res, next) {
 router.post(
   '/',
   requireAuth,
+  uploadLimiter,
   handleUpload,
   [
     body('caption').optional().isString().trim().isLength({ max: 2200 }),

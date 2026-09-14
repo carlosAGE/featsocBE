@@ -257,6 +257,82 @@ describe('GET /api/auth/me', () => {
   });
 });
 
+describe('POST /api/auth/forgot-password', () => {
+  const creds = { email: 'forgot@example.com', password: 'supersecret' };
+
+  it('returns a generic 200 for an unknown email (no enumeration)', async () => {
+    const res = await request(app).post('/api/auth/forgot-password').send({ email: 'nobody@example.com' });
+    expect(res.status).toBe(200);
+    expect(res.body.devResetToken).toBeUndefined();
+  });
+
+  it('returns a dev reset token for a known email outside production', async () => {
+    await request(app).post('/api/auth/signup').send(creds);
+
+    const res = await request(app).post('/api/auth/forgot-password').send({ email: creds.email });
+    expect(res.status).toBe(200);
+    expect(typeof res.body.devResetToken).toBe('string');
+    expect(res.body.devResetToken.length).toBeGreaterThan(0);
+  });
+
+  it('rejects an invalid email with 400', async () => {
+    const res = await request(app).post('/api/auth/forgot-password').send({ email: 'not-an-email' });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('POST /api/auth/reset-password', () => {
+  const creds = { email: 'reset@example.com', password: 'oldpassword' };
+
+  async function getResetToken() {
+    await request(app).post('/api/auth/signup').send(creds);
+    const forgot = await request(app).post('/api/auth/forgot-password').send({ email: creds.email });
+    return forgot.body.devResetToken;
+  }
+
+  it('resets the password and logs the user in with a new session', async () => {
+    const token = await getResetToken();
+
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token, password: 'brandnewpassword' });
+    expect(res.status).toBe(200);
+    expect(res.body.user.email).toBe(creds.email);
+    expect(typeof res.body.token).toBe('string');
+
+    // old password no longer works, new one does
+    const oldLogin = await request(app).post('/api/auth/login').send(creds);
+    expect(oldLogin.status).toBe(401);
+    const newLogin = await request(app)
+      .post('/api/auth/login')
+      .send({ email: creds.email, password: 'brandnewpassword' });
+    expect(newLogin.status).toBe(200);
+  });
+
+  it('rejects an invalid token with 400', async () => {
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token: 'not-a-real-token', password: 'brandnewpassword' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects reusing a token a second time', async () => {
+    const token = await getResetToken();
+    await request(app).post('/api/auth/reset-password').send({ token, password: 'brandnewpassword' });
+
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token, password: 'anotherpassword' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a short new password with 400', async () => {
+    const token = await getResetToken();
+    const res = await request(app).post('/api/auth/reset-password').send({ token, password: 'short' });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe('POST /api/auth/logout', () => {
   it('clears the session cookie', async () => {
     const res = await request(app).post('/api/auth/logout');

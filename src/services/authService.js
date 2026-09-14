@@ -17,7 +17,6 @@ async function generateUniqueUsername(seed) {
 
   // Append a numeric suffix until it's free.
   let suffix = 0;
-  // eslint-disable-next-line no-await-in-loop
   while (await User.exists({ username: candidate })) {
     suffix += 1;
     candidate = `${base}${suffix}`;

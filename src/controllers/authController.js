@@ -7,7 +7,9 @@ const {
 } = require('../services/authService');
 const { signAuthToken } = require('../lib/jwt');
 const { hashPassword, verifyPassword } = require('../lib/password');
+const { createResetToken, hashResetToken } = require('../lib/passwordReset');
 const { setAuthCookie, clearAuthCookie } = require('../lib/cookie');
+const env = require('../config/env');
 const User = require('../models/User');
 
 // Signs a session JWT, sets the httpOnly cookie (web), and returns the shared
@@ -63,7 +65,7 @@ const googleSignIn = asyncHandler(async (req, res) => {
   let profile;
   try {
     profile = await verifyGoogleIdToken(idToken);
-  } catch (err) {
+  } catch {
     throw new ApiError(401, 'Invalid Google token');
   }
 
@@ -87,4 +89,69 @@ const logout = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
-module.exports = { signup, login, googleSignIn, me, logout };
+// POST /api/auth/forgot-password — Body: { email }
+//
+// Always responds 200 with the same generic message regardless of whether
+// the email exists or is social-only — the response must not leak which
+// emails have accounts.
+//
+// NO EMAIL SERVICE EXISTS YET. In a real deployment the raw reset link
+// would be emailed to the user; this project has no email-sending
+// integration configured (and adding one needs a provider + API key this
+// agent doesn't have access to). As a stopgap, non-production environments
+// get the raw token back in the response body so the reset flow is
+// actually testable end to end — production never does. This is a
+// deliberate, documented gap, not a finished delivery mechanism.
+const forgotPassword = asyncHandler(async (req, res) => {
+  const email = String(req.body.email).trim().toLowerCase();
+  const user = await User.findOne({ email });
+
+  const genericBody = {
+    message: 'If an account with that email exists, a password reset link has been sent.',
+  };
+
+  if (!user) {
+    res.json(genericBody);
+    return;
+  }
+
+  const { rawToken, tokenHash, expiresAt } = createResetToken();
+  user.resetPasswordTokenHash = tokenHash;
+  user.resetPasswordExpires = expiresAt;
+  await user.save();
+
+  // Stand-in for an email send — see the doc comment above.
+  // eslint-disable-next-line no-console
+  console.log(`[auth] password reset token for ${email} (expires ${expiresAt.toISOString()}): ${rawToken}`);
+
+  res.json(env.isProd ? genericBody : { ...genericBody, devResetToken: rawToken });
+});
+
+// POST /api/auth/reset-password — Body: { token, password }
+const resetPassword = asyncHandler(async (req, res) => {
+  const { token, password } = req.body;
+  const tokenHash = hashResetToken(token);
+
+  const user = await User.findOne({
+    resetPasswordTokenHash: tokenHash,
+    resetPasswordExpires: { $gt: new Date() },
+  }).select('+resetPasswordTokenHash +resetPasswordExpires');
+
+  if (!user) {
+    throw new ApiError(400, 'This reset link is invalid or has expired');
+  }
+
+  user.passwordHash = await hashPassword(password);
+  user.resetPasswordTokenHash = undefined;
+  user.resetPasswordExpires = undefined;
+  // A password reset is also a good time to add the local provider, in case
+  // this was a social-only account setting a password for the first time.
+  if (!user.authProviders.some((p) => p.provider === 'local')) {
+    user.authProviders.push({ provider: 'local', providerId: null });
+  }
+  await user.save();
+
+  res.json(issueSession(res, user));
+});
+
+module.exports = { signup, login, googleSignIn, me, logout, forgotPassword, resetPassword };
