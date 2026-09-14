@@ -10,6 +10,7 @@ const notificationRoutes = require('./notificationRoutes');
 const reportRoutes = require('./reportRoutes');
 const hashtagRoutes = require('./hashtagRoutes');
 const searchRoutes = require('./searchRoutes');
+const pushTokenRoutes = require('./pushTokenRoutes');
 
 // Aggregates all feature routers under /api (mounted in app.js)
 // New features add one line here plus their own routes/controller/model/test.
@@ -25,5 +26,6 @@ router.use('/notifications', notificationRoutes);
 router.use('/reports', reportRoutes);
 router.use('/hashtags', hashtagRoutes);
 router.use('/search', searchRoutes);
+router.use('/push-tokens', pushTokenRoutes);
 
 module.exports = router;
