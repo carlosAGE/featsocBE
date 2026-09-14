@@ -4,7 +4,7 @@ const os = require('os');
 const { body, param, query } = require('express-validator');
 
 const { validate } = require('../middleware/validate');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, attachUser } = require('../middleware/auth');
 const { ApiError } = require('../middleware/error');
 const env = require('../config/env');
 const ctrl = require('../controllers/videoController');
@@ -53,7 +53,7 @@ router.post(
   ctrl.uploadVideo
 );
 
-router.get('/:id', [param('id').isMongoId()], validate, ctrl.getVideo);
+router.get('/:id', attachUser, [param('id').isMongoId()], validate, ctrl.getVideo);
 
 router.delete(
   '/:id',

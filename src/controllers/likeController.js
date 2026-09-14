@@ -36,4 +36,14 @@ const unlikeVideo = asyncHandler(async (req, res) => {
   res.status(200).json({ data: { liked: false, likeCount: video.likeCount } });
 });
 
-module.exports = { likeVideo, unlikeVideo };
+// Batch-checks which of the given video ids a user has liked. Used by feed/
+// listing endpoints so the client isn't stuck guessing "isLiked" on first
+// load — without this every reload would show every heart as unfilled
+// regardless of actual like state.
+async function getLikedVideoIdSet(userId, videoIds) {
+  if (!userId || videoIds.length === 0) return new Set();
+  const likes = await Like.find({ user: userId, video: { $in: videoIds } }).select('video');
+  return new Set(likes.map((like) => String(like.video)));
+}
+
+module.exports = { likeVideo, unlikeVideo, getLikedVideoIdSet };

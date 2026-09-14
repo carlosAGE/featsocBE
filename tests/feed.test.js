@@ -38,6 +38,20 @@ describe('Feed API', () => {
       const res = await request(app).get('/api/feed?cursor=not-a-date');
       expect(res.status).toBe(400);
     });
+
+    it('defaults isLiked to false with no viewer, and reflects a real like when authenticated', async () => {
+      const { user: owner } = await makeUserWithSession();
+      const video = await makeVideo(owner.id);
+
+      const anonRes = await request(app).get('/api/feed');
+      expect(anonRes.body.data[0].isLiked).toBe(false);
+
+      const { cookie } = await makeUserWithSession();
+      await request(app).post(`/api/videos/${video.id}/like`).set('Cookie', cookie);
+
+      const viewerRes = await request(app).get('/api/feed').set('Cookie', cookie);
+      expect(viewerRes.body.data[0].isLiked).toBe(true);
+    });
   });
 
   describe('GET /api/feed/following', () => {

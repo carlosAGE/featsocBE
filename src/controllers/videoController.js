@@ -8,6 +8,7 @@ const Video = require('../models/Video');
 const { ApiError } = require('../middleware/error');
 const { uploadFile, deleteFile } = require('../lib/r2Client');
 const { probe, normalize, generateThumbnail } = require('../services/videoProcessing');
+const { getLikedVideoIdSet } = require('./likeController');
 
 const asyncHandler = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
@@ -97,7 +98,9 @@ const getVideo = asyncHandler(async (req, res) => {
     { new: true }
   ).populate('owner', 'username displayName avatarUrl');
   if (!video) throw new ApiError(404, 'Video not found');
-  res.json({ data: video });
+
+  const likedSet = await getLikedVideoIdSet(req.user?.id, [video.id]);
+  res.json({ data: { ...video.toJSON(), isLiked: likedSet.has(video.id) } });
 });
 
 // DELETE /api/videos/:id  (requires auth + ownership)

@@ -2,7 +2,7 @@ const express = require('express');
 const { query } = require('express-validator');
 
 const { validate } = require('../middleware/validate');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, attachUser } = require('../middleware/auth');
 const ctrl = require('../controllers/feedController');
 
 const router = express.Router();
@@ -12,7 +12,7 @@ const paginationValidators = [
   query('cursor').optional().isISO8601(),
 ];
 
-router.get('/', paginationValidators, validate, ctrl.getForYouFeed);
+router.get('/', attachUser, paginationValidators, validate, ctrl.getForYouFeed);
 router.get('/following', requireAuth, paginationValidators, validate, ctrl.getFollowingFeed);
 
 module.exports = router;
