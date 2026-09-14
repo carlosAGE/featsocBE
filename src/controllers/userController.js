@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Follow = require('../models/Follow');
 const { asyncHandler } = require('./postController');
 const { ApiError } = require('../middleware/error');
 
@@ -10,10 +11,20 @@ const listUsers = asyncHandler(async (req, res) => {
 });
 
 // GET /api/users/:id
+//
+// isFollowing reflects the signed-in viewer, if any (attachUser is a soft
+// gate — this route stays public), same pattern as isLiked on videos.
 const getUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) throw new ApiError(404, 'User not found');
-  res.json({ data: user });
+
+  let isFollowing = false;
+  if (req.user) {
+    const edge = await Follow.findOne({ follower: req.user.id, following: user.id });
+    isFollowing = Boolean(edge);
+  }
+
+  res.json({ data: { ...user.toJSON(), isFollowing } });
 });
 
 // POST /api/users
