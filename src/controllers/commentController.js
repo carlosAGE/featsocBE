@@ -2,6 +2,8 @@ const Video = require('../models/Video');
 const Comment = require('../models/Comment');
 const { ApiError } = require('../middleware/error');
 const { asyncHandler } = require('./postController');
+const { notify } = require('../lib/notify');
+const { containsBannedContent } = require('../lib/contentFilter');
 
 const AUTHOR_FIELDS = 'username displayName avatarUrl';
 
@@ -32,6 +34,9 @@ const listComments = asyncHandler(async (req, res) => {
 const createComment = asyncHandler(async (req, res) => {
   const video = await Video.findById(req.params.id);
   if (!video) throw new ApiError(404, 'Video not found');
+  if (containsBannedContent(req.body.content)) {
+    throw new ApiError(400, 'Comment violates community guidelines');
+  }
 
   let parentComment = null;
   if (req.body.parentCommentId) {
@@ -52,6 +57,13 @@ const createComment = asyncHandler(async (req, res) => {
   });
   video.commentCount += 1;
   await video.save();
+  await notify({
+    recipient: video.owner,
+    actor: req.user.id,
+    type: 'comment',
+    video: video.id,
+    comment: comment.id,
+  });
 
   await comment.populate('author', AUTHOR_FIELDS);
   res.status(201).json({ data: comment });

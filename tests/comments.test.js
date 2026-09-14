@@ -44,6 +44,17 @@ describe('Comments API', () => {
     expect(res.status).toBe(400);
   });
 
+  it('rejects a comment that fails the content filter (400)', async () => {
+    const { cookie } = await makeUserWithSession();
+    const { user: owner } = await makeUserWithSession();
+    const video = await makeVideo(owner.id);
+    const res = await request(app)
+      .post(`/api/videos/${video.id}/comments`)
+      .set('Cookie', cookie)
+      .send({ content: 'what an asshole thing to say' });
+    expect(res.status).toBe(400);
+  });
+
   it('creates a reply and flattens it under the top-level comment', async () => {
     const { cookie } = await makeUserWithSession();
     const { user: owner } = await makeUserWithSession();

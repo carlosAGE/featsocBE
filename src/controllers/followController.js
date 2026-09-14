@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Follow = require('../models/Follow');
 const { ApiError } = require('../middleware/error');
 const { asyncHandler } = require('./postController');
+const { notify } = require('../lib/notify');
 
 const PUBLIC_FIELDS = 'username displayName avatarUrl followerCount followingCount';
 
@@ -26,6 +27,7 @@ const followUser = asyncHandler(async (req, res) => {
       User.updateOne({ _id: req.user.id }, { $inc: { followingCount: 1 } }),
       User.updateOne({ _id: targetId }, { $inc: { followerCount: 1 } }),
     ]);
+    await notify({ recipient: targetId, actor: req.user.id, type: 'follow' });
   }
 
   res.status(200).json({ data: { following: true } });

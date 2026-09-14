@@ -2,6 +2,7 @@ const Video = require('../models/Video');
 const Like = require('../models/Like');
 const { ApiError } = require('../middleware/error');
 const { asyncHandler } = require('./postController');
+const { notify } = require('../lib/notify');
 
 // POST /api/videos/:id/like  (requires auth)
 //
@@ -17,6 +18,7 @@ const likeVideo = asyncHandler(async (req, res) => {
     await Like.create({ user: req.user.id, video: video.id });
     video.likeCount += 1;
     await video.save();
+    await notify({ recipient: video.owner, actor: req.user.id, type: 'like', video: video.id });
   }
 
   res.status(200).json({ data: { liked: true, likeCount: video.likeCount } });
