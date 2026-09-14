@@ -92,6 +92,16 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    // Expo push tokens for this user's devices. An array, not a single
+    // value — a user can be signed in on more than one device. Stale/
+    // invalid tokens are pruned lazily when Expo's push API reports them as
+    // DeviceNotRegistered (see src/lib/pushNotifications.js), not proactively.
+    pushTokens: {
+      type: [String],
+      default: [],
+      select: false,
+    },
   },
   { timestamps: true }
 );
