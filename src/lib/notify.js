@@ -38,7 +38,7 @@ async function notify({ recipient, actor, type, video, comment }) {
     await sendPushNotifications(recipient, recipientUser.pushTokens, {
       title: 'Featuresoc',
       body,
-      data: { type, videoId: video ? String(video) : null },
+      data: { type, videoId: video ? String(video) : null, actorId: String(actor) },
     });
   } catch (err) {
     // eslint-disable-next-line no-console
